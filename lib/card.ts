@@ -55,7 +55,7 @@ export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
     { l: "Repositories", v: stats.totalRepos, c: "#58a6ff" },
     { l: "Stars Earned", v: stats.totalStars, c: "#e3b341" },
   ];
-  const R = 42,
+  const R = 35,
     C = 2 * Math.PI * R;
 
   let bsvg = "";
@@ -98,13 +98,13 @@ export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
   <text x="25" y="30" font-family="${F}" font-size="16" font-weight="700" fill="url(#ac)" style="animation:fu .5s ease forwards;opacity:0">GitHub Stats</text>
   <text x="25" y="47" font-family="${F}" font-size="11" fill="#484f58" style="animation:fu .5s ease .1s forwards;opacity:0">ekanshsaxena • esaxena-flexport</text>
   <line x1="25" y1="57" x2="470" y2="57" stroke="#21262d"/>
-  <g transform="translate(85,140)" style="animation:fu .6s ease .2s forwards;opacity:0">
-    <circle r="${R}" fill="none" stroke="#21262d" stroke-width="7"/>
-    <circle r="${R}" fill="none" stroke="url(#rg)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90)" style="animation:rd 1.5s ease-out .4s forwards;gl 3s ease-in-out 2s infinite"/>
-    <text y="-4" text-anchor="middle" font-family="${F}" font-size="28" font-weight="800" fill="#e6edf3" style="animation:np .5s ease .8s forwards;opacity:0">${fmt(streak.totalContributions)}</text>
+  <g transform="translate(80,138)" style="animation:fu .6s ease .2s forwards;opacity:0">
+    <circle r="${R}" fill="none" stroke="#21262d" stroke-width="6"/>
+    <circle r="${R}" fill="none" stroke="url(#rg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90)" style="animation:rd 1.5s ease-out .4s forwards"/>
+    <text y="-2" text-anchor="middle" font-family="${F}" font-size="24" font-weight="800" fill="#e6edf3" style="animation:np .5s ease .8s forwards;opacity:0">${fmt(streak.totalContributions)}</text>
     <text y="16" text-anchor="middle" font-family="${F}" font-size="10" fill="#8b949e" style="animation:fu .3s ease 1s forwards;opacity:0">contributions</text>
   </g>
-  <g transform="translate(185,72)">${bsvg}</g>
+  <g transform="translate(175,75)">${bsvg}</g>
   <g style="animation:fu .4s ease 1.2s forwards;opacity:0">
     <text x="25" y="210" font-family="${F}" font-size="10" fill="#484f58">${si} ${streak.currentStreak}d streak · ${streak.longestStreak}d best</text>
   </g>
