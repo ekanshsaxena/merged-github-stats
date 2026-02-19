@@ -1,10 +1,18 @@
 const USERS = ["ekanshsaxena", "esaxena-flexport"];
 
-const headers: Record<string, string> = {
-  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-  Accept: "application/vnd.github.v3+json",
-  "User-Agent": "merged-github-stats",
-};
+function getHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+    "User-Agent": "merged-github-stats",
+  };
+
+  const token = process.env.GITHUB_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
 
 interface GitHubRepo {
   stargazers_count: number;
@@ -37,6 +45,8 @@ export async function getUserStats(): Promise<UserStats> {
   let totalStars = 0;
   let totalIssues = 0;
 
+  const headers = getHeaders();
+
   for (const user of USERS) {
     try {
       // Repos & Stars
@@ -45,7 +55,7 @@ export async function getUserStats(): Promise<UserStats> {
         { headers },
       );
       if (repoRes.ok) {
-        const repos: GitHubRepo[] = await repoRes.json();
+        const repos = (await repoRes.json()) as GitHubRepo[];
         totalRepos += repos.filter((r) => !r.fork).length;
         totalStars += repos.reduce((sum, r) => sum + r.stargazers_count, 0);
       }
@@ -56,7 +66,7 @@ export async function getUserStats(): Promise<UserStats> {
         { headers },
       );
       if (prRes.ok) {
-        const prData: GitHubSearchResult = await prRes.json();
+        const prData = (await prRes.json()) as GitHubSearchResult;
         totalPRs += prData.total_count;
       }
 
@@ -66,7 +76,7 @@ export async function getUserStats(): Promise<UserStats> {
         { headers },
       );
       if (issueRes.ok) {
-        const issueData: GitHubSearchResult = await issueRes.json();
+        const issueData = (await issueRes.json()) as GitHubSearchResult;
         totalIssues += issueData.total_count;
       }
 
@@ -76,7 +86,7 @@ export async function getUserStats(): Promise<UserStats> {
         { headers },
       );
       if (eventRes.ok) {
-        const events: GitHubEvent[] = await eventRes.json();
+        const events = (await eventRes.json()) as GitHubEvent[];
         const commits = events
           .filter((e) => e.type === "PushEvent")
           .reduce((sum, e) => sum + (e.payload.commits?.length ?? 0), 0);
