@@ -39,7 +39,6 @@ function gc(c: number, m: number): string {
         : "#39d353";
 }
 
-// ===== STATS CARD =====
 export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
   const mx = Math.max(
     stats.totalPRs,
@@ -57,20 +56,6 @@ export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
   ];
   const R = 35,
     C = 2 * Math.PI * R;
-
-  let bsvg = "";
-  bars.forEach((b, i) => {
-    const w = Math.max((b.v / mx) * bw, 6);
-    const y = i * 28,
-      dl = (0.3 + i * 0.15).toFixed(2);
-    bsvg += `<g style="animation:fu .5s ease ${dl}s forwards;opacity:0" transform="translate(0,${y})">
-      <text x="0" y="14" font-family="${F}" font-size="12" fill="#8b949e">${b.l}</text>
-      <rect x="110" y="4" width="${bw}" height="10" rx="5" fill="#21262d"/>
-      <rect x="110" y="4" width="0" height="10" rx="5" fill="${b.c}"><animate attributeName="width" from="0" to="${w}" dur=".8s" begin="${dl}s" fill="freeze" calcMode="spline" keySplines=".33 0 .2 1"/></rect>
-      <text x="${110 + bw + 12}" y="14" font-family="${F}" font-size="13" font-weight="700" fill="${b.c}">${fmt(b.v)}</text>
-    </g>`;
-  });
-
   const si =
     streak.currentStreak >= 30
       ? "🔥"
@@ -80,13 +65,19 @@ export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
           ? "✨"
           : "💤";
 
+  let bsvg = "";
+  bars.forEach((b, i) => {
+    const w = Math.max((b.v / mx) * bw, 6);
+    const y = 75 + i * 28;
+    const dl = (0.4 + i * 0.15).toFixed(2);
+    bsvg += `
+    <text x="175" y="${y + 14}" font-family="${F}" font-size="12" fill="#8b949e" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".4s" begin="${dl}s" fill="freeze"/>${b.l}</text>
+    <rect x="285" y="${y + 4}" width="${bw}" height="10" rx="5" fill="#21262d"/>
+    <rect x="285" y="${y + 4}" width="0" height="10" rx="5" fill="${b.c}"><animate attributeName="width" from="0" to="${w}" dur=".8s" begin="${dl}s" fill="freeze"/></rect>
+    <text x="${285 + bw + 12}" y="${y + 14}" font-family="${F}" font-size="13" font-weight="700" fill="${b.c}" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".3s" begin="${(parseFloat(dl) + 0.5).toFixed(2)}s" fill="freeze"/>${fmt(b.v)}</text>`;
+  });
+
   return `<svg width="495" height="220" viewBox="0 0 495 220" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @keyframes fu{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes rd{from{stroke-dashoffset:${C}}to{stroke-dashoffset:${(C * 0.18).toFixed(1)}}}
-    @keyframes np{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
-    @keyframes gl{0%,100%{filter:drop-shadow(0 0 4px rgba(57,211,83,.3))}50%{filter:drop-shadow(0 0 12px rgba(57,211,83,.6))}}
-  </style>
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#161b22"/></linearGradient>
     <linearGradient id="ac" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#58a6ff"/><stop offset="50%" stop-color="#bc8cff"/><stop offset="100%" stop-color="#f778ba"/></linearGradient>
@@ -95,23 +86,31 @@ export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
   </defs>
   <rect x=".5" y=".5" width="494" height="219" rx="12" fill="url(#bg)" stroke="#30363d"/>
   <rect x=".5" y=".5" width="494" height="3" fill="url(#ac)" clip-path="url(#cl)"/>
-  <text x="25" y="30" font-family="${F}" font-size="16" font-weight="700" fill="url(#ac)" style="animation:fu .5s ease forwards;opacity:0">GitHub Stats</text>
-  <text x="25" y="47" font-family="${F}" font-size="11" fill="#484f58" style="animation:fu .5s ease .1s forwards;opacity:0">ekanshsaxena • esaxena-flexport</text>
+  <text x="25" y="30" font-family="${F}" font-size="16" font-weight="700" fill="url(#ac)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".5s" begin="0s" fill="freeze"/>GitHub Stats</text>
+  <text x="25" y="47" font-family="${F}" font-size="11" fill="#484f58" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".5s" begin=".1s" fill="freeze"/>ekanshsaxena • esaxena-flexport</text>
   <line x1="25" y1="57" x2="470" y2="57" stroke="#21262d"/>
-  <g transform="translate(80,138)" style="animation:fu .6s ease .2s forwards;opacity:0">
+
+  <!-- Contribution Ring -->
+  <g transform="translate(85,140)">
     <circle r="${R}" fill="none" stroke="#21262d" stroke-width="6"/>
-    <circle r="${R}" fill="none" stroke="url(#rg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90)" style="animation:rd 1.5s ease-out .4s forwards"/>
-    <text y="-2" text-anchor="middle" font-family="${F}" font-size="24" font-weight="800" fill="#e6edf3" style="animation:np .5s ease .8s forwards;opacity:0">${fmt(streak.totalContributions)}</text>
-    <text y="16" text-anchor="middle" font-family="${F}" font-size="10" fill="#8b949e" style="animation:fu .3s ease 1s forwards;opacity:0">contributions</text>
+    <circle r="${R}" fill="none" stroke="url(#rg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" transform="rotate(-90)">
+      <animate attributeName="stroke-dashoffset" from="${C.toFixed(1)}" to="${(C * 0.18).toFixed(1)}" dur="1.5s" begin=".3s" fill="freeze"/>
+    </circle>
+    <text y="0" text-anchor="middle" font-family="${F}" font-size="24" font-weight="800" fill="#e6edf3" opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur=".5s" begin=".8s" fill="freeze"/>${fmt(streak.totalContributions)}</text>
+    <text y="18" text-anchor="middle" font-family="${F}" font-size="10" fill="#8b949e" opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur=".3s" begin="1s" fill="freeze"/>contributions</text>
   </g>
-  <g transform="translate(175,75)">${bsvg}</g>
-  <g style="animation:fu .4s ease 1.2s forwards;opacity:0">
-    <text x="25" y="210" font-family="${F}" font-size="10" fill="#484f58">${si} ${streak.currentStreak}d streak · ${streak.longestStreak}d best</text>
-  </g>
+
+  <!-- Bar Chart -->
+  ${bsvg}
+
+  <!-- Streak -->
+  <text x="25" y="210" font-family="${F}" font-size="10" fill="#484f58" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".4s" begin="1.2s" fill="freeze"/>${si} ${streak.currentStreak}d streak · ${streak.longestStreak}d best</text>
 </svg>`;
 }
 
-// ===== HEATMAP BUILDER =====
+// ===== HEATMAP =====
 function buildHeatmap(daily: Record<string, number>, year: number): string {
   const cl = 7,
     gp = 1,
@@ -135,7 +134,7 @@ function buildHeatmap(daily: Record<string, number>, year: number): string {
     mons = "";
   let lm = -1;
   for (let w = 0; w < tw; w++) {
-    cells += `<g style="animation:fi .3s ease ${(w * 0.02).toFixed(2)}s forwards;opacity:0">`;
+    const dl = (w * 0.02).toFixed(2);
     for (let d = 0; d < 7; d++) {
       const dt = new Date(ss);
       dt.setDate(ss.getDate() + w * 7 + d);
@@ -147,21 +146,15 @@ function buildHeatmap(daily: Record<string, number>, year: number): string {
       }
       const ds = fd(dt),
         cnt = daily[ds] || 0;
-      cells += `<rect x="${x}" y="${y}" width="${cl}" height="${cl}" rx="1.5" fill="${gc(cnt, mx)}"><title>${ds}: ${cnt}</title></rect>`;
+      cells += `<rect x="${x}" y="${y}" width="${cl}" height="${cl}" rx="1.5" fill="${gc(cnt, mx)}" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".2s" begin="${dl}s" fill="freeze"/><title>${ds}: ${cnt}</title></rect>`;
       if (d === 0 && dt.getMonth() !== lm) {
         lm = dt.getMonth();
         mons += `<text x="${x}" y="${7 * st + 10}" font-family="${F}" font-size="8" fill="#484f58">${MS[lm]}</text>`;
       }
     }
-    cells += `</g>`;
   }
 
-  const dl = [1, 3, 5]
-    .map(
-      (i) =>
-        `<text x="-20" y="${i * st + 6}" font-family="${F}" font-size="8" fill="#484f58">${["", "Mon", "", "Wed", "", "Fri", ""][i]}</text>`,
-    )
-    .join("");
+  const dl = `<text x="-20" y="${1 * st + 6}" font-family="${F}" font-size="8" fill="#484f58">Mon</text><text x="-22" y="${3 * st + 6}" font-family="${F}" font-size="8" fill="#484f58">Wed</text><text x="-16" y="${5 * st + 6}" font-family="${F}" font-size="8" fill="#484f58">Fri</text>`;
   const lx = (tw - 1) * st - 85,
     ly = 7 * st + 22;
   const leg =
@@ -191,12 +184,6 @@ export function renderStreakCard(streak: StreakInfo, year?: number): string {
           : "💤";
 
   return `<svg width="495" height="210" viewBox="0 0 495 210" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @keyframes fu{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes fi{from{opacity:0}to{opacity:1}}
-    @keyframes np{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
-    @keyframes gl{0%,100%{filter:drop-shadow(0 0 3px rgba(57,211,83,.2))}50%{filter:drop-shadow(0 0 8px rgba(57,211,83,.5))}}
-  </style>
   <defs>
     <linearGradient id="b2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#161b22"/></linearGradient>
     <linearGradient id="a2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#58a6ff"/><stop offset="50%" stop-color="#bc8cff"/><stop offset="100%" stop-color="#f778ba"/></linearGradient>
@@ -204,14 +191,12 @@ export function renderStreakCard(streak: StreakInfo, year?: number): string {
   </defs>
   <rect x=".5" y=".5" width="494" height="209" rx="12" fill="url(#b2)" stroke="#30363d"/>
   <rect x=".5" y=".5" width="494" height="3" fill="url(#a2)" clip-path="url(#c2)"/>
-  <text x="25" y="30" font-family="${F}" font-size="16" font-weight="700" fill="url(#a2)" style="animation:fu .5s ease forwards;opacity:0">Contribution Activity</text>
-  <text x="25" y="47" font-family="${F}" font-size="11" fill="#484f58" style="animation:fu .5s ease .1s forwards;opacity:0">ekanshsaxena • esaxena-flexport</text>
-  <text x="470" y="30" text-anchor="end" font-family="${F}" font-size="14" font-weight="700" fill="#39d353" style="animation:np .5s ease .2s forwards;opacity:0">${fmt(streak.totalContributions)} contributions</text>
-  <text x="470" y="47" text-anchor="end" font-family="${F}" font-size="11" fill="#484f58" style="animation:fu .4s ease .3s forwards;opacity:0">in ${yr}</text>
+  <text x="25" y="30" font-family="${F}" font-size="16" font-weight="700" fill="url(#a2)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".5s" begin="0s" fill="freeze"/>Contribution Activity</text>
+  <text x="25" y="47" font-family="${F}" font-size="11" fill="#484f58" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".5s" begin=".1s" fill="freeze"/>ekanshsaxena • esaxena-flexport</text>
+  <text x="470" y="30" text-anchor="end" font-family="${F}" font-size="14" font-weight="700" fill="#39d353" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".5s" begin=".2s" fill="freeze"/>${fmt(streak.totalContributions)} contributions</text>
+  <text x="470" y="47" text-anchor="end" font-family="${F}" font-size="11" fill="#484f58" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".4s" begin=".3s" fill="freeze"/>in ${yr}</text>
   <line x1="25" y1="57" x2="470" y2="57" stroke="#21262d"/>
   <g transform="translate(48,68)">${hm}</g>
-  <g style="animation:fu .4s ease 1s forwards;opacity:0">
-    <text x="25" y="202" font-family="${F}" font-size="10" fill="#484f58">${si} ${streak.currentStreak}d streak · ${streak.longestStreak}d longest · Use ?year=YYYY to view other years</text>
-  </g>
+  <text x="25" y="202" font-family="${F}" font-size="10" fill="#484f58" opacity="0"><animate attributeName="opacity" from="0" to="1" dur=".4s" begin="1s" fill="freeze"/>${si} ${streak.currentStreak}d streak · ${streak.longestStreak}d longest · ?year=YYYY for other years</text>
 </svg>`;
 }
