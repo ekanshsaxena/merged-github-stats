@@ -1,22 +1,21 @@
 const USERS = ["ekanshsaxena", "esaxena-flexport"];
 
-interface ContributionDay {
-  date: string;
-  count: number;
-}
-
-interface ContributionResponse {
-  contributions: ContributionDay[];
-}
-
 export interface StreakInfo {
   currentStreak: number;
   longestStreak: number;
   totalContributions: number;
+  dailyContributions: Record<string, number>;
+}
+
+function fmtDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export async function getMergedStreak(): Promise<StreakInfo> {
-  const dateMap = new Map<string, number>();
+  const dateMap: Record<string, number> = {};
 
   for (const user of USERS) {
     try {
@@ -24,72 +23,61 @@ export async function getMergedStreak(): Promise<StreakInfo> {
         `https://github-contributions-api.jogruber.de/v4/${user}`,
       );
       if (!res.ok) continue;
-
-      const data: ContributionResponse = await res.json();
-
-      for (const day of data.contributions) {
-        const existing = dateMap.get(day.date) ?? 0;
-        dateMap.set(day.date, existing + day.count);
+      const data: any = await res.json();
+      if (data.contributions) {
+        for (const day of data.contributions) {
+          dateMap[day.date] = (dateMap[day.date] || 0) + day.count;
+        }
       }
     } catch (err) {
       console.error(`Error fetching contributions for ${user}:`, err);
     }
   }
 
-  // Sort dates descending
-  const sorted = [...dateMap.entries()]
-    .filter(([, count]) => count > 0)
-    .map(([date]) => date)
-    .sort()
-    .reverse();
-
-  // Calculate total contributions
   let totalContributions = 0;
-  for (const [, count] of dateMap) {
+  for (const count of Object.values(dateMap)) {
     totalContributions += count;
   }
 
-  // Current streak: consecutive days ending today or yesterday
+  const activeDateSet = new Set(
+    Object.entries(dateMap)
+      .filter(([, c]) => c > 0)
+      .map(([d]) => d),
+  );
+
+  // Current streak
   let currentStreak = 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  for (let i = 0; i < sorted.length; i++) {
-    const d = new Date(sorted[i]);
-    d.setHours(0, 0, 0, 0);
-    const diffDays = Math.round(
-      (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (diffDays <= currentStreak + 1) {
-      currentStreak++;
-    } else {
-      break;
-    }
+  const checkDate = new Date(today);
+  if (!activeDateSet.has(fmtDate(today))) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+  while (activeDateSet.has(fmtDate(checkDate))) {
+    currentStreak++;
+    checkDate.setDate(checkDate.getDate() - 1);
   }
 
   // Longest streak
-  const allDates = [...dateMap.entries()]
-    .filter(([, count]) => count > 0)
-    .map(([date]) => date)
-    .sort();
-
-  let longestStreak = 0;
-  let tempStreak = 0;
-
-  for (let i = 0; i < allDates.length; i++) {
+  const sortedDates = [...activeDateSet].sort();
+  let longestStreak = 0,
+    tempStreak = 0;
+  for (let i = 0; i < sortedDates.length; i++) {
     if (i === 0) {
       tempStreak = 1;
     } else {
-      const prev = new Date(allDates[i - 1]);
-      const curr = new Date(allDates[i]);
-      const diff = Math.round(
-        (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const prev = new Date(sortedDates[i - 1]);
+      const curr = new Date(sortedDates[i]);
+      const diff = Math.round((curr.getTime() - prev.getTime()) / 86400000);
       tempStreak = diff === 1 ? tempStreak + 1 : 1;
     }
     longestStreak = Math.max(longestStreak, tempStreak);
   }
 
-  return { currentStreak, longestStreak, totalContributions };
+  return {
+    currentStreak,
+    longestStreak,
+    totalContributions,
+    dailyContributions: dateMap,
+  };
 }

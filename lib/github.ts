@@ -1,37 +1,16 @@
 const USERS = ["ekanshsaxena", "esaxena-flexport"];
 
 function getHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
+  const h: Record<string, string> = {
     Accept: "application/vnd.github.v3+json",
     "User-Agent": "merged-github-stats",
   };
-
   const token = process.env.GITHUB_TOKEN;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  return headers;
-}
-
-interface GitHubRepo {
-  stargazers_count: number;
-  fork: boolean;
-}
-
-interface GitHubSearchResult {
-  total_count: number;
-}
-
-interface GitHubEvent {
-  type: string;
-  payload: {
-    commits?: Array<unknown>;
-  };
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
 }
 
 export interface UserStats {
-  totalCommits: number;
   totalPRs: number;
   totalRepos: number;
   totalStars: number;
@@ -39,63 +18,48 @@ export interface UserStats {
 }
 
 export async function getUserStats(): Promise<UserStats> {
-  let totalCommits = 0;
-  let totalPRs = 0;
-  let totalRepos = 0;
-  let totalStars = 0;
-  let totalIssues = 0;
-
+  let totalPRs = 0,
+    totalRepos = 0,
+    totalStars = 0,
+    totalIssues = 0;
   const headers = getHeaders();
 
   for (const user of USERS) {
     try {
-      // Repos & Stars
       const repoRes = await fetch(
         `https://api.github.com/users/${user}/repos?per_page=100&type=all`,
         { headers },
       );
       if (repoRes.ok) {
-        const repos = (await repoRes.json()) as GitHubRepo[];
-        totalRepos += repos.filter((r) => !r.fork).length;
-        totalStars += repos.reduce((sum, r) => sum + r.stargazers_count, 0);
+        const repos: any[] = await repoRes.json();
+        totalRepos += repos.filter((r: any) => !r.fork).length;
+        totalStars += repos.reduce(
+          (s: number, r: any) => s + (r.stargazers_count || 0),
+          0,
+        );
       }
 
-      // PRs
       const prRes = await fetch(
         `https://api.github.com/search/issues?q=author:${user}+type:pr`,
         { headers },
       );
       if (prRes.ok) {
-        const prData = (await prRes.json()) as GitHubSearchResult;
-        totalPRs += prData.total_count;
+        const d: any = await prRes.json();
+        totalPRs += d.total_count || 0;
       }
 
-      // Issues
-      const issueRes = await fetch(
+      const issRes = await fetch(
         `https://api.github.com/search/issues?q=author:${user}+type:issue`,
         { headers },
       );
-      if (issueRes.ok) {
-        const issueData = (await issueRes.json()) as GitHubSearchResult;
-        totalIssues += issueData.total_count;
-      }
-
-      // Commits (via events — approximate, last 90 days)
-      const eventRes = await fetch(
-        `https://api.github.com/users/${user}/events?per_page=100`,
-        { headers },
-      );
-      if (eventRes.ok) {
-        const events = (await eventRes.json()) as GitHubEvent[];
-        const commits = events
-          .filter((e) => e.type === "PushEvent")
-          .reduce((sum, e) => sum + (e.payload.commits?.length ?? 0), 0);
-        totalCommits += commits;
+      if (issRes.ok) {
+        const d: any = await issRes.json();
+        totalIssues += d.total_count || 0;
       }
     } catch (err) {
       console.error(`Error fetching stats for ${user}:`, err);
     }
   }
 
-  return { totalCommits, totalPRs, totalRepos, totalStars, totalIssues };
+  return { totalPRs, totalRepos, totalStars, totalIssues };
 }

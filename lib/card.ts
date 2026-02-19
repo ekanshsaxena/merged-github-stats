@@ -1,250 +1,220 @@
 import type { UserStats } from "./github";
 import type { StreakInfo } from "./streak";
 
-function formatNumber(n: number): string {
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+function fmt(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1000) return (n / 1000).toFixed(1) + "k";
   return n.toString();
 }
 
-// Animated fire emoji for streak
-function getStreakIcon(streak: number): string {
-  if (streak >= 30) return "🔥";
-  if (streak >= 7) return "⚡";
-  if (streak >= 1) return "✨";
+function streakIcon(s: number): string {
+  if (s >= 30) return "🔥";
+  if (s >= 7) return "⚡";
+  if (s >= 1) return "✨";
   return "💤";
 }
 
-export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
-  const icon = getStreakIcon(streak.currentStreak);
+function fmtDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
-  return `
-<svg width="495" height="195" viewBox="0 0 495 195" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
-    </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#58a6ff" />
-      <stop offset="50%" style="stop-color:#bc8cff" />
-      <stop offset="100%" style="stop-color:#f778ba" />
-    </linearGradient>
-    <linearGradient id="streakGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#f78166" />
-      <stop offset="100%" style="stop-color:#ffa657" />
-    </linearGradient>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.3"/>
-    </filter>
-    <clipPath id="roundedBg">
-      <rect x="0.5" y="0.5" width="494" height="194" rx="12" ry="12"/>
-    </clipPath>
-  </defs>
+function getColor(count: number, max: number): string {
+  if (count === 0) return "#161b22";
+  const r = count / max;
+  if (r <= 0.25) return "#0e4429";
+  if (r <= 0.5) return "#006d32";
+  if (r <= 0.75) return "#26a641";
+  return "#39d353";
+}
 
-  <!-- Background -->
-  <rect x="0.5" y="0.5" width="494" height="194" rx="12" ry="12" fill="url(#bgGrad)" stroke="#30363d" stroke-width="1"/>
-  
-  <!-- Subtle top accent line -->
-  <rect x="0.5" y="0.5" width="494" height="3" rx="12" ry="12" fill="url(#accentGrad)" clip-path="url(#roundedBg)"/>
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const FONT = "'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif";
 
-  <!-- Title -->
-  <g transform="translate(25, 35)">
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="18" font-weight="700" fill="url(#accentGrad)">
-      Combined GitHub Stats
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="11" fill="#8b949e" y="20">
-      ekanshsaxena + esaxena-flexport
-    </text>
-  </g>
+function badge(x: number, y: number): string {
+  return `<g transform="translate(${x},${y})">
+    <rect width="108" height="22" rx="11" fill="rgba(31,111,235,0.15)" stroke="#1f6feb" stroke-width="0.5"/>
+    <text x="54" y="15" text-anchor="middle" font-family="${FONT}" font-size="10" font-weight="600" fill="#58a6ff">🔀 Merged Stats</text>
+  </g>`;
+}
 
-  <!-- Divider -->
-  <line x1="25" y1="68" x2="470" y2="68" stroke="#21262d" stroke-width="1"/>
+function heatmapSvg(daily: Record<string, number>): string {
+  const cell = 10,
+    gap = 2,
+    step = cell + gap,
+    weeks = 35;
 
-  <!-- Stats Grid - Left Column -->
-  <g transform="translate(25, 90)">
-    <!-- Commits -->
-    <g>
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="#58a6ff">
-        <path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/>
-      </svg>
-      <text x="24" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" fill="#c9d1d9">
-        Commits
-      </text>
-      <text x="200" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" font-weight="700" fill="#58a6ff" text-anchor="end">
-        ${formatNumber(stats.totalCommits)}
-      </text>
-    </g>
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay();
+  const curSun = new Date(today);
+  curSun.setDate(today.getDate() - dow);
+  const startSun = new Date(curSun);
+  startSun.setDate(curSun.getDate() - (weeks - 1) * 7);
 
-    <!-- PRs -->
-    <g transform="translate(0, 28)">
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="#bc8cff">
-        <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
-      </svg>
-      <text x="24" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" fill="#c9d1d9">
-        Pull Requests
-      </text>
-      <text x="200" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" font-weight="700" fill="#bc8cff" text-anchor="end">
-        ${formatNumber(stats.totalPRs)}
-      </text>
-    </g>
+  let maxC = 1;
+  for (const c of Object.values(daily)) {
+    if (c > maxC) maxC = c;
+  }
 
-    <!-- Issues -->
-    <g transform="translate(0, 56)">
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="#3fb950">
-        <path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/>
-        <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/>
-      </svg>
-      <text x="24" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" fill="#c9d1d9">
-        Issues
-      </text>
-      <text x="200" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" font-weight="700" fill="#3fb950" text-anchor="end">
-        ${formatNumber(stats.totalIssues)}
-      </text>
-    </g>
-  </g>
+  let cells = "",
+    months = "";
+  let lastM = -1;
 
-  <!-- Stats Grid - Right Column -->
-  <g transform="translate(260, 90)">
-    <!-- Repos -->
-    <g>
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="#f0883e">
-        <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/>
-      </svg>
-      <text x="24" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" fill="#c9d1d9">
-        Repos
-      </text>
-      <text x="200" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" font-weight="700" fill="#f0883e" text-anchor="end">
-        ${formatNumber(stats.totalRepos)}
-      </text>
-    </g>
+  for (let w = 0; w < weeks; w++) {
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(startSun);
+      dt.setDate(startSun.getDate() + w * 7 + d);
+      if (dt > today) continue;
 
-    <!-- Stars -->
-    <g transform="translate(0, 28)">
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="#e3b341">
-        <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-      </svg>
-      <text x="24" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" fill="#c9d1d9">
-        Stars
-      </text>
-      <text x="200" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" font-weight="700" fill="#e3b341" text-anchor="end">
-        ${formatNumber(stats.totalStars)}
-      </text>
-    </g>
+      const ds = fmtDate(dt);
+      const count = daily[ds] || 0;
+      const x = w * step,
+        y = d * step;
+      cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${getColor(count, maxC)}"><title>${ds}: ${count}</title></rect>`;
 
-    <!-- Contributions -->
-    <g transform="translate(0, 56)">
-      <svg viewBox="0 0 16 16" width="16" height="16" fill="#f778ba">
-        <path d="M7.823.177 12.65 4.96a.25.25 0 0 1-.177.427H9.019l3.458 3.71a.25.25 0 0 1-.183.392H9.333l2.896 4.044a.25.25 0 0 1-.204.394H8.75v2.322a.25.25 0 0 1-.5 0v-2.322H4.979a.25.25 0 0 1-.204-.394l2.896-4.044H4.71a.25.25 0 0 1-.183-.392l3.458-3.71H4.527a.25.25 0 0 1-.177-.427L9.177.177a.25.25 0 0 1 .354 0l-.708.707Z"/>
-      </svg>
-      <text x="24" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" fill="#c9d1d9">
-        Contributions
-      </text>
-      <text x="200" y="13" font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="14" font-weight="700" fill="#f778ba" text-anchor="end">
-        ${formatNumber(streak.totalContributions)}
-      </text>
-    </g>
-  </g>
-
-  <!-- Streak animation keyframes -->
-  <style>
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(5px); }
-      to { opacity: 1; transform: translateY(0); }
+      const mo = dt.getMonth();
+      if (d === 0 && mo !== lastM) {
+        months += `<text x="${x}" y="${7 * step + 11}" font-family="${FONT}" font-size="9" fill="#484f58">${MONTHS[mo]}</text>`;
+        lastM = mo;
+      }
     }
-    .stat-row { animation: fadeIn 0.6s ease forwards; }
-  </style>
+  }
+
+  const dayLabels =
+    `<text x="-26" y="${1 * step + 9}" font-family="${FONT}" font-size="9" fill="#484f58">Mon</text>` +
+    `<text x="-28" y="${3 * step + 9}" font-family="${FONT}" font-size="9" fill="#484f58">Wed</text>` +
+    `<text x="-20" y="${5 * step + 9}" font-family="${FONT}" font-size="9" fill="#484f58">Fri</text>`;
+
+  const lx = weeks * step - 115;
+  const ly = 7 * step + 24;
+  const legend =
+    `<text x="${lx}" y="${ly}" font-family="${FONT}" font-size="9" fill="#484f58">Less</text>` +
+    `<rect x="${lx + 24}" y="${ly - 9}" width="${cell}" height="${cell}" rx="2" fill="#161b22"/>` +
+    `<rect x="${lx + 36}" y="${ly - 9}" width="${cell}" height="${cell}" rx="2" fill="#0e4429"/>` +
+    `<rect x="${lx + 48}" y="${ly - 9}" width="${cell}" height="${cell}" rx="2" fill="#006d32"/>` +
+    `<rect x="${lx + 60}" y="${ly - 9}" width="${cell}" height="${cell}" rx="2" fill="#26a641"/>` +
+    `<rect x="${lx + 72}" y="${ly - 9}" width="${cell}" height="${cell}" rx="2" fill="#39d353"/>` +
+    `<text x="${lx + 87}" y="${ly}" font-family="${FONT}" font-size="9" fill="#484f58">More</text>`;
+
+  return dayLabels + cells + months + legend;
+}
+
+// ===== STATS CARD =====
+export function renderStatsCard(stats: UserStats, streak: StreakInfo): string {
+  return `<svg width="495" height="195" viewBox="0 0 495 195" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="ac" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#58a6ff"/><stop offset="50%" stop-color="#bc8cff"/><stop offset="100%" stop-color="#f778ba"/>
+    </linearGradient>
+    <clipPath id="cl"><rect x="0.5" y="0.5" width="494" height="194" rx="12"/></clipPath>
+  </defs>
+  <rect x="0.5" y="0.5" width="494" height="194" rx="12" fill="url(#bg)" stroke="#30363d"/>
+  <rect x="0.5" y="0.5" width="494" height="3" fill="url(#ac)" clip-path="url(#cl)"/>
+
+  <text x="25" y="33" font-family="${FONT}" font-size="18" font-weight="700" fill="url(#ac)">Combined GitHub Stats</text>
+  <text x="25" y="50" font-family="${FONT}" font-size="11" fill="#8b949e">@ekanshsaxena ∪ @esaxena-flexport</text>
+  ${badge(362, 18)}
+  <line x1="25" y1="63" x2="470" y2="63" stroke="#21262d"/>
+
+  <g transform="translate(25,82)">
+    <circle cx="8" cy="8" r="4" fill="#39d353"/>
+    <text x="24" y="12" font-family="${FONT}" font-size="13" fill="#c9d1d9">Contributions</text>
+    <text x="205" y="12" font-family="${FONT}" font-size="13" font-weight="700" fill="#39d353" text-anchor="end">${fmt(streak.totalContributions)}</text>
+
+    <circle cx="8" cy="34" r="4" fill="#bc8cff"/>
+    <text x="24" y="38" font-family="${FONT}" font-size="13" fill="#c9d1d9">Pull Requests</text>
+    <text x="205" y="38" font-family="${FONT}" font-size="13" font-weight="700" fill="#bc8cff" text-anchor="end">${fmt(stats.totalPRs)}</text>
+
+    <circle cx="8" cy="60" r="4" fill="#f0883e"/>
+    <text x="24" y="64" font-family="${FONT}" font-size="13" fill="#c9d1d9">Issues</text>
+    <text x="205" y="64" font-family="${FONT}" font-size="13" font-weight="700" fill="#f0883e" text-anchor="end">${fmt(stats.totalIssues)}</text>
+  </g>
+
+  <g transform="translate(260,82)">
+    <circle cx="8" cy="8" r="4" fill="#58a6ff"/>
+    <text x="24" y="12" font-family="${FONT}" font-size="13" fill="#c9d1d9">Repositories</text>
+    <text x="205" y="12" font-family="${FONT}" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="end">${fmt(stats.totalRepos)}</text>
+
+    <circle cx="8" cy="34" r="4" fill="#e3b341"/>
+    <text x="24" y="38" font-family="${FONT}" font-size="13" fill="#c9d1d9">Stars Earned</text>
+    <text x="205" y="38" font-family="${FONT}" font-size="13" font-weight="700" fill="#e3b341" text-anchor="end">${fmt(stats.totalStars)}</text>
+
+    <circle cx="8" cy="60" r="4" fill="#f97583"/>
+    <text x="24" y="64" font-family="${FONT}" font-size="13" fill="#c9d1d9">Current Streak</text>
+    <text x="205" y="64" font-family="${FONT}" font-size="13" font-weight="700" fill="#f97583" text-anchor="end">${streak.currentStreak} days</text>
+  </g>
 </svg>`;
 }
 
+// ===== STREAK + HEATMAP CARD =====
 export function renderStreakCard(streak: StreakInfo): string {
-  const icon = getStreakIcon(streak.currentStreak);
+  const icon = streakIcon(streak.currentStreak);
+  const heatmap = heatmapSvg(streak.dailyContributions);
 
-  return `
-<svg width="495" height="165" viewBox="0 0 495 165" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="495" height="295" viewBox="0 0 495 295" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#161b22"/>
     </linearGradient>
-    <linearGradient id="fireGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#f78166" />
-      <stop offset="50%" style="stop-color:#ffa657" />
-      <stop offset="100%" style="stop-color:#e3b341" />
+    <linearGradient id="ac2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#58a6ff"/><stop offset="50%" stop-color="#bc8cff"/><stop offset="100%" stop-color="#f778ba"/>
     </linearGradient>
-    <linearGradient id="accentGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#58a6ff" />
-      <stop offset="50%" style="stop-color:#bc8cff" />
-      <stop offset="100%" style="stop-color:#f778ba" />
+    <linearGradient id="fire" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#f78166"/><stop offset="50%" stop-color="#ffa657"/><stop offset="100%" stop-color="#e3b341"/>
     </linearGradient>
-    <clipPath id="roundedBg2">
-      <rect x="0.5" y="0.5" width="494" height="164" rx="12" ry="12"/>
-    </clipPath>
+    <clipPath id="cl2"><rect x="0.5" y="0.5" width="494" height="294" rx="12"/></clipPath>
   </defs>
+  <rect x="0.5" y="0.5" width="494" height="294" rx="12" fill="url(#bg2)" stroke="#30363d"/>
+  <rect x="0.5" y="0.5" width="494" height="3" fill="url(#ac2)" clip-path="url(#cl2)"/>
 
-  <!-- Background -->
-  <rect x="0.5" y="0.5" width="494" height="164" rx="12" ry="12" fill="url(#bgGrad2)" stroke="#30363d" stroke-width="1"/>
-  
-  <!-- Top accent line -->
-  <rect x="0.5" y="0.5" width="494" height="3" rx="12" ry="12" fill="url(#accentGrad2)" clip-path="url(#roundedBg2)"/>
+  <text x="25" y="33" font-family="${FONT}" font-size="18" font-weight="700" fill="url(#ac2)">${icon} Contribution Streak</text>
+  <text x="25" y="50" font-family="${FONT}" font-size="11" fill="#8b949e">@ekanshsaxena ∪ @esaxena-flexport</text>
+  ${badge(362, 18)}
+  <line x1="25" y1="60" x2="470" y2="60" stroke="#21262d"/>
 
-  <!-- Title -->
-  <g transform="translate(25, 35)">
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="18" font-weight="700" fill="url(#accentGrad2)">
-      ${icon} Contribution Streak
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="11" fill="#8b949e" y="20">
-      ekanshsaxena + esaxena-flexport
-    </text>
+  <!-- Streak stats -->
+  <g transform="translate(55,75)">
+    <text font-family="${FONT}" font-size="36" font-weight="800" fill="url(#fire)" text-anchor="middle" x="55" y="28">${streak.currentStreak}</text>
+    <text font-family="${FONT}" font-size="12" fill="#8b949e" text-anchor="middle" x="55" y="46">Current Streak</text>
+    <text font-family="${FONT}" font-size="10" fill="#484f58" text-anchor="middle" x="55" y="60">days</text>
+  </g>
+  <line x1="180" y1="72" x2="180" y2="138" stroke="#21262d"/>
+  <g transform="translate(195,75)">
+    <text font-family="${FONT}" font-size="36" font-weight="800" fill="#bc8cff" text-anchor="middle" x="55" y="28">${streak.longestStreak}</text>
+    <text font-family="${FONT}" font-size="12" fill="#8b949e" text-anchor="middle" x="55" y="46">Longest Streak</text>
+    <text font-family="${FONT}" font-size="10" fill="#484f58" text-anchor="middle" x="55" y="60">days</text>
+  </g>
+  <line x1="320" y1="72" x2="320" y2="138" stroke="#21262d"/>
+  <g transform="translate(335,75)">
+    <text font-family="${FONT}" font-size="36" font-weight="800" fill="#58a6ff" text-anchor="middle" x="55" y="28">${fmt(streak.totalContributions)}</text>
+    <text font-family="${FONT}" font-size="12" fill="#8b949e" text-anchor="middle" x="55" y="46">Total Contribs</text>
+    <text font-family="${FONT}" font-size="10" fill="#484f58" text-anchor="middle" x="55" y="60">this year</text>
   </g>
 
-  <!-- Divider -->
-  <line x1="25" y1="68" x2="470" y2="68" stroke="#21262d" stroke-width="1"/>
+  <line x1="25" y1="148" x2="470" y2="148" stroke="#21262d"/>
 
-  <!-- Streak Columns -->
-  <!-- Current Streak -->
-  <g transform="translate(60, 88)">
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="36" font-weight="800" fill="url(#fireGrad)" text-anchor="middle" x="55" y="30">
-      ${streak.currentStreak}
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="12" fill="#8b949e" text-anchor="middle" x="55" y="52">
-      Current Streak
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="11" fill="#484f58" text-anchor="middle" x="55" y="68">
-      days
-    </text>
-  </g>
-
-  <!-- Separator -->
-  <line x1="195" y1="82" x2="195" y2="155" stroke="#21262d" stroke-width="1"/>
-
-  <!-- Longest Streak -->
-  <g transform="translate(208, 88)">
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="36" font-weight="800" fill="#bc8cff" text-anchor="middle" x="55" y="30">
-      ${streak.longestStreak}
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="12" fill="#8b949e" text-anchor="middle" x="55" y="52">
-      Longest Streak
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="11" fill="#484f58" text-anchor="middle" x="55" y="68">
-      days
-    </text>
-  </g>
-
-  <!-- Separator -->
-  <line x1="340" y1="82" x2="340" y2="155" stroke="#21262d" stroke-width="1"/>
-
-  <!-- Total Contributions -->
-  <g transform="translate(353, 88)">
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="36" font-weight="800" fill="#58a6ff" text-anchor="middle" x="55" y="30">
-      ${formatNumber(streak.totalContributions)}
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="12" fill="#8b949e" text-anchor="middle" x="55" y="52">
-      Total Contribs
-    </text>
-    <text font-family="'Segoe UI', Ubuntu, 'Helvetica Neue', sans-serif" font-size="11" fill="#484f58" text-anchor="middle" x="55" y="68">
-      this year
-    </text>
+  <!-- Heatmap -->
+  <g transform="translate(58,160)">
+    ${heatmap}
   </g>
 </svg>`;
 }

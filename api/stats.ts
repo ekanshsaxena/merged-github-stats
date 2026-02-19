@@ -17,17 +17,16 @@ export default async function handler(
     const [stats, streak] = await Promise.all([
       getUserStats().catch((err: unknown) => {
         console.error("getUserStats failed:", err);
-        return {
-          totalCommits: 0,
-          totalPRs: 0,
-          totalRepos: 0,
-          totalStars: 0,
-          totalIssues: 0,
-        };
+        return { totalPRs: 0, totalRepos: 0, totalStars: 0, totalIssues: 0 };
       }),
       getMergedStreak().catch((err: unknown) => {
         console.error("getMergedStreak failed:", err);
-        return { currentStreak: 0, longestStreak: 0, totalContributions: 0 };
+        return {
+          currentStreak: 0,
+          longestStreak: 0,
+          totalContributions: 0,
+          dailyContributions: {} as Record<string, number>,
+        };
       }),
     ]);
 
