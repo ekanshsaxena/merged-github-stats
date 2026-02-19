@@ -1,15 +1,29 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getUserStats } from "../lib/github";
-import { getMergedStreak } from "../lib/streak";
-import { renderStatsCard, renderStreakCard } from "../lib/card";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    // Dynamic imports to catch any module-level errors
+    const { getUserStats } = await import("../lib/github");
+    const { getMergedStreak } = await import("../lib/streak");
+    const { renderStatsCard, renderStreakCard } = await import("../lib/card");
+
     const { type } = req.query;
 
     const [stats, streak] = await Promise.all([
-      getUserStats(),
-      getMergedStreak(),
+      getUserStats().catch((err) => {
+        console.error("getUserStats failed:", err);
+        return {
+          totalCommits: 0,
+          totalPRs: 0,
+          totalRepos: 0,
+          totalStars: 0,
+          totalIssues: 0,
+        };
+      }),
+      getMergedStreak().catch((err) => {
+        console.error("getMergedStreak failed:", err);
+        return { currentStreak: 0, longestStreak: 0, totalContributions: 0 };
+      }),
     ]);
 
     let svg: string;
@@ -20,22 +34,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       svg = renderStatsCard(stats, streak);
     }
 
-    // Cache for 30 min, stale-while-revalidate for 1 hour
     res.setHeader(
       "Cache-Control",
       "public, s-maxage=1800, stale-while-revalidate=3600",
     );
     res.setHeader("Content-Type", "image/svg+xml");
     return res.status(200).send(svg);
-  } catch (error) {
-    console.error("Error generating stats card:", error);
+  } catch (error: unknown) {
+    console.error("Handler top-level error:", error);
 
-    // Return a graceful error SVG
+    const message = error instanceof Error ? error.message : "Unknown error";
+
     const errorSvg = `
 <svg width="495" height="100" viewBox="0 0 495 100" xmlns="http://www.w3.org/2000/svg">
   <rect x="0.5" y="0.5" width="494" height="99" rx="12" ry="12" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
-  <text x="247.5" y="55" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="14" fill="#f85149" text-anchor="middle">
-    Error fetching GitHub stats. Check GITHUB_TOKEN.
+  <text x="247.5" y="45" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="14" fill="#f85149" text-anchor="middle">
+    Error fetching GitHub stats
+  </text>
+  <text x="247.5" y="70" font-family="'Segoe UI', Ubuntu, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+    ${message.substring(0, 80)}
   </text>
 </svg>`;
 
