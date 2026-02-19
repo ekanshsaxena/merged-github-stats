@@ -7,20 +7,18 @@ export interface StreakInfo {
   dailyContributions: Record<string, number>;
 }
 
-function fmtDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function fd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export async function getMergedStreak(): Promise<StreakInfo> {
+export async function getMergedStreak(year?: number): Promise<StreakInfo> {
   const dateMap: Record<string, number> = {};
+  const yearParam = year ? `?year=${year}` : "";
 
   for (const user of USERS) {
     try {
       const res = await fetch(
-        `https://github-contributions-api.jogruber.de/v4/${user}`,
+        `https://github-contributions-api.jogruber.de/v4/${user}${yearParam}`,
       );
       if (!res.ok) continue;
       const data: any = await res.json();
@@ -30,48 +28,42 @@ export async function getMergedStreak(): Promise<StreakInfo> {
         }
       }
     } catch (err) {
-      console.error(`Error fetching contributions for ${user}:`, err);
+      console.error(`Contributions error ${user}:`, err);
     }
   }
 
   let totalContributions = 0;
-  for (const count of Object.values(dateMap)) {
-    totalContributions += count;
-  }
+  for (const c of Object.values(dateMap)) totalContributions += c;
 
-  const activeDateSet = new Set(
+  const active = new Set(
     Object.entries(dateMap)
       .filter(([, c]) => c > 0)
       .map(([d]) => d),
   );
 
-  // Current streak
   let currentStreak = 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const checkDate = new Date(today);
-  if (!activeDateSet.has(fmtDate(today))) {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-  while (activeDateSet.has(fmtDate(checkDate))) {
+  const check = new Date(today);
+  if (!active.has(fd(today))) check.setDate(check.getDate() - 1);
+  while (active.has(fd(check))) {
     currentStreak++;
-    checkDate.setDate(checkDate.getDate() - 1);
+    check.setDate(check.getDate() - 1);
   }
 
-  // Longest streak
-  const sortedDates = [...activeDateSet].sort();
+  const sorted = [...active].sort();
   let longestStreak = 0,
-    tempStreak = 0;
-  for (let i = 0; i < sortedDates.length; i++) {
+    temp = 0;
+  for (let i = 0; i < sorted.length; i++) {
     if (i === 0) {
-      tempStreak = 1;
+      temp = 1;
     } else {
-      const prev = new Date(sortedDates[i - 1]);
-      const curr = new Date(sortedDates[i]);
-      const diff = Math.round((curr.getTime() - prev.getTime()) / 86400000);
-      tempStreak = diff === 1 ? tempStreak + 1 : 1;
+      const p = new Date(sorted[i - 1]);
+      const c = new Date(sorted[i]);
+      temp =
+        Math.round((c.getTime() - p.getTime()) / 864e5) === 1 ? temp + 1 : 1;
     }
-    longestStreak = Math.max(longestStreak, tempStreak);
+    longestStreak = Math.max(longestStreak, temp);
   }
 
   return {
