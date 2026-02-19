@@ -1,16 +1,28 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { IncomingMessage, ServerResponse } from "http";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+interface ParsedQuery {
+  [key: string]: string | string[] | undefined;
+}
+
+export default async function handler(
+  req: IncomingMessage,
+  res: ServerResponse,
+) {
   try {
+    // Parse query string
+    const url = new URL(
+      req.url || "/",
+      `http://${req.headers.host || "localhost"}`,
+    );
+    const type = url.searchParams.get("type");
+
     // Dynamic imports to catch any module-level errors
     const { getUserStats } = await import("../lib/github");
     const { getMergedStreak } = await import("../lib/streak");
     const { renderStatsCard, renderStreakCard } = await import("../lib/card");
 
-    const { type } = req.query;
-
     const [stats, streak] = await Promise.all([
-      getUserStats().catch((err) => {
+      getUserStats().catch((err: unknown) => {
         console.error("getUserStats failed:", err);
         return {
           totalCommits: 0,
@@ -20,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           totalIssues: 0,
         };
       }),
-      getMergedStreak().catch((err) => {
+      getMergedStreak().catch((err: unknown) => {
         console.error("getMergedStreak failed:", err);
         return { currentStreak: 0, longestStreak: 0, totalContributions: 0 };
       }),
@@ -39,7 +51,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       "public, s-maxage=1800, stale-while-revalidate=3600",
     );
     res.setHeader("Content-Type", "image/svg+xml");
-    return res.status(200).send(svg);
+    res.statusCode = 200;
+    res.end(svg);
   } catch (error: unknown) {
     console.error("Handler top-level error:", error);
 
@@ -57,6 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 </svg>`;
 
     res.setHeader("Content-Type", "image/svg+xml");
-    return res.status(200).send(errorSvg);
+    res.statusCode = 200;
+    res.end(errorSvg);
   }
 }
